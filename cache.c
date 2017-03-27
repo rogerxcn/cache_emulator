@@ -60,7 +60,7 @@ void    cache_print_stats    (Cache *c, char *header){
 
 ////////////////////////////////////////////////////////////////////
 // Note: the system provides the cache with the line address
-// Return HIT if access hits in the cache, MISS otherwise 
+// Return HIT if access hits in the cache, MISS otherwise
 // Also if mark_dirty is TRUE, then mark the resident line as dirty
 // Update appropriate stats
 ////////////////////////////////////////////////////////////////////
@@ -70,15 +70,21 @@ Flag    cache_access(Cache *c, Addr lineaddr, uns mark_dirty){
 
   // Your Code Goes Here
 
-  uns64 cache_line_num = lineaddr % (c->num_sets);
-  uns64 cache_tag_num = lineaddr >> (int) (log(c->num_sets)/log(2));
-  
-  for (int i = 0; i < (c->num_ways); i++){
-    if (c->sets->line[i]->tag == cache_tag_num){
+  uns64 target_set = lineaddr % (c->num_sets);
+  uns64 index_max = 1;
+  uns64 index_length = 1;
+  while(index_max < c->num_sets){
+    index_max <<= 1;
+    index_length++;
+  }
+  uns64 target_tag = lineaddr >> index_length;
+
+  for (uns i = 0; i < (c->num_ways); i++){
+    if ((c->sets+target_set)->line[i].tag == target_tag){
       outcome = HIT;
     }
   }
-  
+
   return outcome;
 }
 
@@ -89,27 +95,37 @@ Flag    cache_access(Cache *c, Addr lineaddr, uns mark_dirty){
 ////////////////////////////////////////////////////////////////////
 
 void    cache_install(Cache *c, Addr lineaddr, uns mark_dirty){
-  
+
   // Your Code Goes Here
   // Note: You can use cycle_count as timestamp for LRU
 
-  uns64 victim_set_num = lineaddr % (c->num_sets);
-  uns64 line_tag_num = lineaddr >> (log(c->num_sets)/log(2));
-  if (c->repl_policy == RAND){
-    uns64 victim_way_num = rand()%(c->num_ways);
-    c->last_evicted_line = c->sets->line[victim_way_num];
-    c->sets->line[victim_way_num] = line_tag_num;
-  }else if (c->repl_policy == LRU) {
-    for (int i = 0; i < (c->num_ways); i++){
-      int 
-      if (c->sets->line[i]->tag == cache_tag_num){
-        outcome = HIT;
-      }
+  uns64 target_set = lineaddr % (c->num_sets);
+  uns64 index_max = 1;
+  uns64 index_length = 1;
+  while(index_max < c->num_sets){
+    index_max <<= 1;
+    index_length++;
   }
+  uns64 target_tag = lineaddr >> index_length;
+
+  if (c->repl_policy == 1){
+    uns64 victim_way = rand()%(c->num_ways);
+    c->last_evicted_line = (c->sets+target_set)->line[victim_way];
+    (c->sets+target_set)->line[victim_way].tag = target_tag;
+  }else if (c->repl_policy == 0) {
+    int least_used = 0;
+    uns least_used_ts = (c->sets+target_set)->line[least_used].last_access_time;
+
+    for (uns i = 1; i < (c->num_ways); i++){
+      if ((c->sets+target_set)->line[least_used].last_access_time < least_used_ts){
+        least_used = i;
+        least_used_ts = (c->sets+target_set)->line[least_used].last_access_time;
+      }
+    }
+
+    (c->sets+target_set)->line[least_used].tag = target_tag;
   }
 }
 
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
-
-
