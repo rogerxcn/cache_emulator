@@ -70,20 +70,22 @@ Flag    cache_access(Cache *c, Addr lineaddr, uns mark_dirty){
 
   // Your Code Goes Here
 
-  uns64 target_set = lineaddr % (c->num_sets);
-  uns64 index_max = 1;
-  uns64 index_length = 1;
-  while(index_max < c->num_sets){
-    index_max <<= 1;
-    index_length++;
-  }
-  uns64 target_tag = lineaddr >> index_length;
+  uns64 target_set = lineaddr % c->num_sets;
+  uns64 target_tag = lineaddr / c->num_sets;
 
   for (uns i = 0; i < (c->num_ways); i++){
-    if ((c->sets+target_set)->line[i].tag == target_tag){
+
+    if (((c->sets+target_set)->line[i].tag == target_tag) && ((c->sets+target_set)->line[i].valid)){
       outcome = HIT;
+      if (mark_dirty) (c->sets+target_set)->line[i].dirty = TRUE;
+      (c->sets+target_set)->line[i].last_access_time = cycle_count;
     }
+
   }
+
+  mark_dirty ? c->stat_write_access++ : c->stat_read_access++;
+  if (outcome == MISS && mark_dirty) c->stat_write_miss++;
+  if (outcome == MISS && !mark_dirty) c->stat_read_miss++;
 
   return outcome;
 }
@@ -99,32 +101,40 @@ void    cache_install(Cache *c, Addr lineaddr, uns mark_dirty){
   // Your Code Goes Here
   // Note: You can use cycle_count as timestamp for LRU
 
-  uns64 target_set = lineaddr % (c->num_sets);
-  uns64 index_max = 1;
-  uns64 index_length = 1;
-  while(index_max < c->num_sets){
-    index_max <<= 1;
-    index_length++;
-  }
-  uns64 target_tag = lineaddr >> index_length;
+  uns64 target_set = lineaddr % c->num_sets;
+  uns64 target_tag = lineaddr / c->num_sets;
 
   if (c->repl_policy == 1){
+
     uns64 victim_way = rand()%(c->num_ways);
     c->last_evicted_line = (c->sets+target_set)->line[victim_way];
     (c->sets+target_set)->line[victim_way].tag = target_tag;
-  }else if (c->repl_policy == 0) {
-    int least_used = 0;
-    uns least_used_ts = (c->sets+target_set)->line[least_used].last_access_time;
+    (c->sets+target_set)->line[victim_way].valid = TRUE;
+    (c->sets+target_set)->line[victim_way].dirty = FALSE;
+    (c->sets+target_set)->line[victim_way].last_access_time = cycle_count;
 
-    for (uns i = 1; i < (c->num_ways); i++){
-      if ((c->sets+target_set)->line[least_used].last_access_time < least_used_ts){
+  }else if (c->repl_policy == 0) {
+
+    uns least_used = 0;
+    uns least_used_ts = (c->sets+target_set)->line[0].last_access_time;
+
+    for (uns i = 0; i < (c->num_ways); i++){
+      if ((c->sets+target_set)->line[i].last_access_time < least_used_ts){
         least_used = i;
-        least_used_ts = (c->sets+target_set)->line[least_used].last_access_time;
+        least_used_ts = (c->sets+target_set)->line[i].last_access_time;
       }
     }
 
+    c->last_evicted_line = (c->sets+target_set)->line[least_used];
     (c->sets+target_set)->line[least_used].tag = target_tag;
+    (c->sets+target_set)->line[least_used].valid = TRUE;
+    (c->sets+target_set)->line[least_used].dirty = mark_dirty;
+    (c->sets+target_set)->line[least_used].last_access_time = cycle_count;
+
   }
+
+  if (c->last_evicted_line.dirty && c->last_evicted_line.valid) c->stat_dirty_evicts++;
+
 }
 
 ////////////////////////////////////////////////////////////////////
