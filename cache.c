@@ -110,7 +110,7 @@ void    cache_install(Cache *c, Addr lineaddr, uns mark_dirty){
     c->last_evicted_line = (c->sets+target_set)->line[victim_way];
     (c->sets+target_set)->line[victim_way].tag = target_tag;
     (c->sets+target_set)->line[victim_way].valid = TRUE;
-    (c->sets+target_set)->line[victim_way].dirty = FALSE;
+    (c->sets+target_set)->line[victim_way].dirty = mark_dirty;
     (c->sets+target_set)->line[victim_way].last_access_time = cycle_count;
 
   }else if (c->repl_policy == 0) {
